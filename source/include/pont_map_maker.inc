@@ -37,6 +37,6 @@ native bool: pmm_get_random_points( const Array: arPoints, const iPointsCount, c
  * 								If you specify "all", it will take into account all objects
  * 								If object is empty/invalid = automatically sets "general"
  * 
- * @return						Returns 'true' if at least 1 random point was written to the array, otherwise 'false'
+ * @return						Returns 'true' if at least 1 point was written to the array, otherwise 'false'
  */
 native bool: pmm_get_all_points( const Array: arPoints, const szObjectName[ ] = "general" );

@@ -306,7 +306,6 @@ public MenuPointMaker_Handler( const pPlayer, const iMenuKey )
 				UTIL_PlaySound( pPlayer, PluginSounds[ Sound_Error ] );
 			}
 
-
 			( gl_bitsUserShowAllPoints ) ? EnableHookChain( gl_HookChain_Player_PreThink_Post ) : DisableHookChain( gl_HookChain_Player_PreThink_Post );
 		}
 		case 7: {
@@ -524,7 +523,7 @@ public bool: native_get_random_points( const iPluginId, const iParamsCount )
 
 	// Do random
 	SortADTArray( arTempPoints, Sort_Random, Sort_Float );
-	iGetPointsCount = clamp( iGetPointsCount, 1, ArraySize( arTempPoints ) );
+	iGetPointsCount = min( iGetPointsCount, ArraySize( arTempPoints ) );
 
 	new Vector3( vecOrigin );
 	while ( iGetPointsCount-- ) {
@@ -611,10 +610,8 @@ stock bool: IsPointFree( const Vector3( vecOrigin ) )
 	new pEntity = MaxClients; pEntity = engfunc( EngFunc_FindEntityInSphere, pEntity, vecSrc, 18.0 );
 	if ( !is_nullent( pEntity ) )
 	{
-		/**
-		 * Some default entities have SOLID_TRIGGER, so in order not to take them into account, we can skip them
-		 */
 	#if defined EnableIgnoreList
+		// Some default entities have SOLID_TRIGGER, so in order not to take them into account, we can skip them
 		for ( new i = 0, iIterations = sizeof IgnoreEntitiesList; i < iIterations; i++ )
 		{
 			if ( FClassnameIs( pEntity, IgnoreEntitiesList[ i ] ) )
