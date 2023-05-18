@@ -1,0 +1,45 @@
+[en]
+PMM_Menu_Title = \yPoint Map Maker^n\dMap: \w%s \d| Points: \w%i
+
+PMM_Menu_AddPoint = Add Point \d(Position)
+PMM_Menu_RemovePoint = Remove Point \d(Cursor)
+PMM_Menu_SwitchObject = Switch object \d(\y%s\d)
+PMM_Menu_ShowPoints = Show all Points \d(%s)
+PMM_Menu_RemovePoints = Remove All Points
+PMM_Menu_SavePoints = Save Points
+PMM_Menu_Exit = Exit
+
+PMM_Console_OnlyForPlayer = This command only for players.
+
+PMM_Chat_AddedPoint = Added point
+PMM_Chat_DeletePoint = Delete point
+PMM_Chat_Object = Object
+PMM_Chat_Origin = Origin
+PMM_Chat_NotFind = Not a single point was found near at a distance of ^3%.2f
+PMM_Chat_NoPoints = There is not a single point on the map.
+PMM_Chat_AddPointForUse = Add a new point to enable this setting.
+PMM_Chat_DeteleAllPoints = All points have been removed.
+PMM_Chat_SavePoints = All points have been saved to ^3"%s"
+
+[ru]
+PMM_Menu_Title = \yPoint Map Maker^n\dКарта: \w%s \d| Точки: \w%i
+
+PMM_Menu_AddPoint = Добавить точку \d(Позиция)
+PMM_Menu_RemovePoint = Удалить точку \d(Курсор)
+PMM_Menu_SwitchObject = Поменять объект \d(\y%s\d)
+PMM_Menu_ShowPoints = Показать все Точки \d(%s)
+PMM_Menu_RemovePoints = Удалить все точки
+PMM_Menu_SavePoints = Сохранить точки
+PMM_Menu_Exit = Выход
+
+PMM_Console_OnlyForPlayer = Данная команда только для игроков.
+
+PMM_Chat_AddedPoint = Добавлена точка
+PMM_Chat_DeletePoint = Удалена точка
+PMM_Chat_Object = Объект
+PMM_Chat_Origin = Позиция
+PMM_Chat_NotFind = Не найдено ни одной точки в дистанции ^3%.2f ^1юнитов
+PMM_Chat_NoPoints = На карте нет ни одной точки.
+PMM_Chat_AddPointForUse = Добавьте новую точку, чтоб использовать это.
+PMM_Chat_DeteleAllPoints = Все точки были удалены!
+PMM_Chat_SavePoints = Все точки были сохранены в ^3"%s"
