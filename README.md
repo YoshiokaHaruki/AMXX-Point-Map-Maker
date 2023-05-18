@@ -1,9 +1,17 @@
 # AMXX Point Map Maker
 Unified system for creating points on the map for your plugins.
 
-This system was created in order not to produce `"point generators"` for certain plugins. Why do all this if you can use 1 plugin for all this?
+This system was created in order not to produce "point generators" for certain plugins. Why do all this if you can use 1 plugin for all this?
 
 This plugin creates points on the map and saves them in a `json` file with the name of the map. For convenience, so that the plugin can be used for many other systems at the same time, you can create points with a specific object name, so that in the future, in the desired plugin, you can search for points by this object name.
+
+---
+
+### Requirements
+
+- ReHLDS, ReGameDLL, ReAPI, Metamod-R (or Metamod-P), AMX Mod X 1.9.0+
+
+NB! In the next versions I will make Non-ReAPI support
 
 ---
 
@@ -22,6 +30,9 @@ This plugin creates points on the map and saves them in a `json` file with the n
   ]
 }
 ```
+
+- `"object1"` - This is the name of our object, followed by an array with all the points. In order to remove the dots from the object we need, we need to use the names of objects from the `json` file that is specified in `""`
+- `[*, *, *]` - One of our points
 
 ---
 
