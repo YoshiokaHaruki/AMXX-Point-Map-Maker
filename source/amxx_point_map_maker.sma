@@ -1,5 +1,5 @@
 public stock const PluginName[ ] =			"[AMXX] Addon: Point Map Maker";
-public stock const PluginVersion[ ] =		"1.0.0";
+public stock const PluginVersion[ ] =		"1.0.1";
 public stock const PluginAuthor[ ] =		"Yoshioka Haruki";
 
 /* ~ [ Includes ] ~ */
@@ -181,7 +181,7 @@ public RG_CBasePlayer__PreThink_Post( const pPlayer )
 		for ( i = 0; i < gl_iPointsCount; i++ )
 		{
 			ArrayGetArray( gl_arMapPoints, i, aTempData );
-
+			
 			UTIL_TE_BEAMPOINTS_DEBUG( MSG_ONE_UNRELIABLE, pPlayer, aTempData[ PointOrigin ], 10, DebugBeamColors[ equal( aTempData[ PointObjectName ], ObjectNames[ gl_iObjectNow ] ) ] );
 		}
 
@@ -324,7 +324,6 @@ public MenuPointMaker_Handler( const pPlayer, const iMenuKey )
 			JSON_Points_Save( gl_arMapPoints );
 		}
 		case 9: {
-			UTIL_DestroyMenu( pPlayer );
 			return;
 		}
 	}
@@ -342,8 +341,6 @@ public JSON_Points_Load( const Array: arHandle )
 	if ( JSON_Handle == Invalid_JSON )
 	{
 		server_print( "[%s] Invalid read file: ^"%s^"", PluginPrefix, gl_szFilePath );
-
-		json_free( JSON_Handle );
 		return;
 	}
 
@@ -462,7 +459,7 @@ public bool: native_get_random_point( const iPluginId, const iParamsCount )
 		return false;
 	}
 
-	new iIterations, iStartPoint = _random( iPointsCount );
+	new iIterations, iStartPoint = random_num( 0, iPointsCount - 1 );
 
 	do {
 		ArrayGetArray( arTempPoints, iStartPoint, aTempData[ PointOrigin ] );
@@ -572,20 +569,12 @@ public bool: native_get_all_points( const iPluginId, const iParamsCount )
 }
 
 /* ~ [ Stocks ] ~ */
-stock _random( const iMax )
-{
-	if ( !iMax )
-		return 0;
-
-	return random_num( 0, iMax - 1 );
-}
-
 /* -> Get player end eye position of aiming (w/o Trace) <- */
 stock UTIL_GetEyePointAiming( const pPlayer, const Float: flDistance, Vector3( vecEndPos ), const iIgnoreId = DONT_IGNORE_MONSTERS )
 {
-	static Vector3( vecStart ); UTIL_GetEyePosition( pPlayer, vecStart );
-	static Vector3( vecAiming ); UTIL_GetVectorAiming( pPlayer, vecAiming );
-	static Vector3( vecEnd ); xs_vec_add_scaled( vecStart, vecAiming, flDistance, vecEnd );
+	new Vector3( vecStart ); UTIL_GetEyePosition( pPlayer, vecStart );
+	new Vector3( vecAiming ); UTIL_GetVectorAiming( pPlayer, vecAiming );
+	new Vector3( vecEnd ); xs_vec_add_scaled( vecStart, vecAiming, flDistance, vecEnd );
 
 	engfunc( EngFunc_TraceLine, vecStart, vecEnd, iIgnoreId, pPlayer, 0 );
 	get_tr2( 0, TR_vecEndPos, vecEndPos );
@@ -627,9 +616,10 @@ stock bool: IsPointFree( const Vector3( vecOrigin ) )
 
 stock UTIL_PlaySound( const pPlayer, const szSoundPath[ ] )
 {
-	if ( equal( szSoundPath[ strlen( szSoundPath ) - 4 ], ".mp3" ) )
+	if ( szSoundPath[ strlen( szSoundPath ) - 1 ] == '3' )
 		client_cmd( pPlayer, "mp3 play ^"sound/%s^"", szSoundPath );
-	else client_cmd( pPlayer, "spk ^"%s^"", szSoundPath );
+	else
+		client_cmd( pPlayer, "spk ^"%s^"", szSoundPath );
 }
 
 /* -> TE_BEAMPOINTS <- */
@@ -682,18 +672,11 @@ stock UTIL_TE_TELEPORT( const iDest, const pReceiver, const Vector3( vecOrigin )
 	message_end( );
 }
 
-/* -> Destroy Menu <- */
-stock UTIL_DestroyMenu( const pPlayer )
-{
-	show_menu( pPlayer, 0, "^n", 1 );
-	menu_cancel( pPlayer );
-}
-
 /* -> Get player eye position <- */
 stock UTIL_GetEyePosition( const pPlayer, Vector3( vecEyeLevel ) )
 {
-	static Vector3( vecOrigin ); get_entvar( pPlayer, var_origin, vecOrigin );
-	static Vector3( vecViewOfs ); get_entvar( pPlayer, var_view_ofs, vecViewOfs );
+	new Vector3( vecOrigin ); get_entvar( pPlayer, var_origin, vecOrigin );
+	new Vector3( vecViewOfs ); get_entvar( pPlayer, var_view_ofs, vecViewOfs );
 
 	xs_vec_add( vecOrigin, vecViewOfs, vecEyeLevel );
 }
@@ -701,8 +684,8 @@ stock UTIL_GetEyePosition( const pPlayer, Vector3( vecEyeLevel ) )
 /* -> Get Player vector Aiming <- */
 stock UTIL_GetVectorAiming( const pPlayer, Vector3( vecAiming ) ) 
 {
-	static Vector3( vecViewAngle ); get_entvar( pPlayer, var_v_angle, vecViewAngle );
-	static Vector3( vecPunchAngle ); get_entvar( pPlayer, var_punchangle, vecPunchAngle );
+	new Vector3( vecViewAngle ); get_entvar( pPlayer, var_v_angle, vecViewAngle );
+	new Vector3( vecPunchAngle ); get_entvar( pPlayer, var_punchangle, vecPunchAngle );
 
 	xs_vec_add( vecViewAngle, vecPunchAngle, vecViewAngle );
 	angle_vector( vecViewAngle, ANGLEVECTOR_FORWARD, vecAiming );
