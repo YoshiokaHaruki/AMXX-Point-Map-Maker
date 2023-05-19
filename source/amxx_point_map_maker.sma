@@ -79,7 +79,7 @@ new gl_szMapName[ MAX_NAME_LENGTH ];
 new gl_szFilePath[ MAX_CONFIG_PATH_LENGHT ];
 new HookChain: gl_HookChain_Player_PreThink_Post;
 
-enum _: ePointsData {
+enum ePointsData {
 	PointObjectName[ MAX_NAME_LENGTH ],
 	Vector3( PointOrigin )
 };
@@ -178,12 +178,13 @@ public RG_CBasePlayer__PreThink_Post( const pPlayer )
 
 	if ( flLastUpdate < flGameTime )
 	{
-		static i, aTempData[ ePointsData ];
+		static i, aTempData[ ePointsData ], Vector3( vecOrigin );
 		for ( i = 0; i < gl_iPointsCount; i++ )
 		{
 			ArrayGetArray( gl_arMapPoints, i, aTempData );
+			xs_vec_copy( aTempData[ PointOrigin ], vecOrigin );
 			
-			UTIL_TE_BEAMPOINTS_DEBUG( MSG_ONE_UNRELIABLE, pPlayer, aTempData[ PointOrigin ], 10, DebugBeamColors[ equal( aTempData[ PointObjectName ], ObjectNames[ gl_iObjectNow ] ) ] );
+			UTIL_TE_BEAMPOINTS_DEBUG( MSG_ONE_UNRELIABLE, pPlayer, vecOrigin, 10, DebugBeamColors[ equal( aTempData[ PointObjectName ], ObjectNames[ gl_iObjectNow ] ) ] );
 		}
 
 		flLastUpdate = flGameTime + 1.0;
@@ -241,7 +242,9 @@ public MenuPointMaker_Handler( const pPlayer, const iMenuKey )
 			gl_iPointsCount++;
 
 			UTIL_PlaySound( pPlayer, PluginSounds[ Sound_AddPoint ] );
-			UTIL_TE_IMPLOSION( MSG_ONE_UNRELIABLE, pPlayer, aTempData[ PointOrigin ] );
+
+			new Vector3( vecOrigin ); xs_vec_copy( aTempData[ PointOrigin ], vecOrigin );
+			UTIL_TE_IMPLOSION( MSG_ONE_UNRELIABLE, pPlayer, vecOrigin );
 
 			client_print_color( pPlayer, print_team_default, "^4[%s]^1 %l ^3#%i^1. %l: ^3^"%s^" ^1%l: ^3%.2f %.2f %.2f", PluginPrefix, "PMM_Chat_AddedPoint", gl_iPointsCount, "PMM_Chat_Object", aTempData[ PointObjectName ], "PMM_Chat_Origin", aTempData[ PointOrigin ][ 0 ], aTempData[ PointOrigin ][ 1 ], aTempData[ PointOrigin ][ 2 ] );
 		}
@@ -272,7 +275,9 @@ public MenuPointMaker_Handler( const pPlayer, const iMenuKey )
 
 					gl_iPointsCount--;
 					client_print_color( pPlayer, print_team_default, "^4[%s]^1 %l ^3#%i^1. %l: ^3^"%s^" ^1%l: ^3%.2f %.2f %.2f", PluginPrefix, "PMM_Chat_DeletePoint", iFindOrigin + 1, "PMM_Chat_Object", aTempData[ PointObjectName ], "PMM_Chat_Origin", aTempData[ PointOrigin ][ 0 ], aTempData[ PointOrigin ][ 1 ], aTempData[ PointOrigin ][ 2 ] );
-					UTIL_TE_TELEPORT( MSG_ONE_UNRELIABLE, pPlayer, aTempData[ PointOrigin ] );
+
+					new Vector3( vecOrigin ); xs_vec_copy( aTempData[ PointOrigin ], vecOrigin );
+					UTIL_TE_TELEPORT( MSG_ONE_UNRELIABLE, pPlayer, vecOrigin );
 
 					UTIL_PlaySound( pPlayer, PluginSounds[ Sound_DeletePoint ] );
 
@@ -473,6 +478,8 @@ public bool: native_get_random_point( const iPluginId, const iParamsCount )
 
 	if ( bool: get_param( arg_check_point_free ) )
 	{
+		new Vector3( vecOrigin );
+
 		do {
 			if ( !iPointsCount )
 			{
@@ -483,8 +490,10 @@ public bool: native_get_random_point( const iPluginId, const iParamsCount )
 			iPointsCount--;
 			ArrayGetArray( arTempPoints, 0, aTempData[ PointOrigin ] );
 			ArrayDeleteItem( arTempPoints, 0 );
+
+			xs_vec_copy( aTempData[ PointOrigin ], vecOrigin );
 		}
-		while ( !IsPointFree( aTempData[ PointOrigin ] ) )
+		while ( !IsPointFree( vecOrigin ) )
 	}
 	else
 		ArrayGetArray( arTempPoints, 0, aTempData[ PointOrigin ] );
