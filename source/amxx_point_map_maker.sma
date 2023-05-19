@@ -1,5 +1,5 @@
 public stock const PluginName[ ] =			"[AMXX] Addon: Point Map Maker";
-public stock const PluginVersion[ ] =		"1.0.1";
+public stock const PluginVersion[ ] =		"1.0.2";
 public stock const PluginAuthor[ ] =		"Yoshioka Haruki";
 
 /* ~ [ Includes ] ~ */
@@ -15,7 +15,7 @@ public stock const PluginAuthor[ ] =		"Yoshioka Haruki";
  */
 // #define AddMenuToAmxModMenu
 
-new const PluginPrefix[ ] =					"Point Map Maker"; // Plugin prefix (in chat and natives)
+new const PluginPrefix[ ] =					"Point Maker"; // Plugin prefix (in chat and natives)
 new const MainFolder[ ] =					"/PointMaker"; // Main folder with map points
 new const PointSprite[ ] =					"sprites/laserbeam.spr";
 new const PluginSounds[ ][ ] = {
@@ -44,7 +44,7 @@ new const ObjectNames[ ][ ] = {
 		"weaponbox", "armoury_entity", "grenade"
 	};
 #endif
-new const DebugBeamColors[ 2 ][ 3 ] = {
+new const DebugBeamColors[ ][ ] = {
 	{ 255, 255, 255 }, // Not active object 
 	{ 0, 255, 0 } // Active object
 }
@@ -99,6 +99,7 @@ public plugin_natives( )
 	register_native( "pmm_get_random_point", "native_get_random_point" );
 	register_native( "pmm_get_random_points", "native_get_random_points" );
 	register_native( "pmm_get_all_points", "native_get_all_points" );
+	register_native( "pmm_free_array", "native_free_array" );
 }
 
 public plugin_precache( )
@@ -208,7 +209,7 @@ public ConsoleCommand__PointMaker( const pCaller, const bitsFlags )
 /* ~ [ Menus ] ~ */
 public MenuPointMaker_Show( const pPlayer )
 {
-	if ( !is_user_connected( pPlayer ) )
+	if ( gl_arMapPoints == Invalid_Array )
 		return;
 
 	new szBuffer[ MAX_MENU_LENGTH ], iLen;
@@ -230,9 +231,6 @@ public MenuPointMaker_Show( const pPlayer )
 
 public MenuPointMaker_Handler( const pPlayer, const iMenuKey )
 {
-	if ( !is_user_connected( pPlayer ) )
-		return;
-
 	switch ( iMenuKey ) {
 		case 0: {
 			new aTempData[ ePointsData ];
@@ -389,6 +387,12 @@ public JSON_Points_Load( const Array: arHandle )
 
 public JSON_Points_Save( const Array: arHandle )
 {
+	if ( arHandle == Invalid_Array )
+	{
+		log_error( AMX_ERR_NATIVE, "[%s] Main Array is Invalid.", PluginPrefix );
+		return;
+	}
+
 	new JSON: JSON_Handle = json_init_object( );
 	new JSON: JSON_PointObject = Invalid_JSON;
 	new JSON: JSON_PointOrigin = Invalid_JSON;
@@ -433,7 +437,13 @@ public bool: native_get_random_point( const iPluginId, const iParamsCount )
 		return false;
 	}
 
-	enum { arg_origin = 1, arg_object };
+	if ( gl_arMapPoints == Invalid_Array )
+	{
+		log_error( AMX_ERR_NATIVE, "[%s] Main Array is Invalid.", PluginPrefix );
+		return false;
+	}
+
+	enum { arg_origin = 1, arg_object, arg_check_point_free };
 
 	new szObjectName[ MAX_NAME_LENGTH ];
 	get_string( arg_object, szObjectName, charsmax( szObjectName ) );
@@ -459,19 +469,25 @@ public bool: native_get_random_point( const iPluginId, const iParamsCount )
 		return false;
 	}
 
-	new iIterations, iStartPoint = random_num( 0, iPointsCount - 1 );
+	SortADTArray( arTempPoints, Sort_Random, Sort_Float );
 
-	do {
-		ArrayGetArray( arTempPoints, iStartPoint, aTempData[ PointOrigin ] );
+	if ( bool: get_param( arg_check_point_free ) )
+	{
+		do {
+			if ( !iPointsCount )
+			{
+				ArrayDestroy( arTempPoints );
+				return false;
+			}
 
-		if ( ++iStartPoint >= iPointsCount )
-			iStartPoint = 0;
-
-		if ( ++iIterations > iPointsCount )
-			return false;
-
+			iPointsCount--;
+			ArrayGetArray( arTempPoints, 0, aTempData[ PointOrigin ] );
+			ArrayDeleteItem( arTempPoints, 0 );
+		}
+		while ( !IsPointFree( aTempData[ PointOrigin ] ) )
 	}
-	while ( !IsPointFree( aTempData[ PointOrigin ] ) )
+	else
+		ArrayGetArray( arTempPoints, 0, aTempData[ PointOrigin ] );
 
 	ArrayDestroy( arTempPoints );
 
@@ -484,6 +500,12 @@ public bool: native_get_random_points( const iPluginId, const iParamsCount )
 	if ( !gl_iPointsCount )
 	{
 		log_amx( "[%s] There are no available points.", PluginPrefix );
+		return false;
+	}
+
+	if ( gl_arMapPoints == Invalid_Array )
+	{
+		log_error( AMX_ERR_NATIVE, "[%s] Main Array is Invalid.", PluginPrefix );
 		return false;
 	}
 
@@ -518,7 +540,6 @@ public bool: native_get_random_points( const iPluginId, const iParamsCount )
 			ArrayPushArray( arTempPoints, aTempData[ PointOrigin ] );
 	}
 
-	// Do random
 	SortADTArray( arTempPoints, Sort_Random, Sort_Float );
 	iGetPointsCount = min( iGetPointsCount, ArraySize( arTempPoints ) );
 
@@ -539,6 +560,12 @@ public bool: native_get_all_points( const iPluginId, const iParamsCount )
 	if ( !gl_iPointsCount )
 	{
 		log_amx( "[%s] There are no available points.", PluginPrefix );
+		return false;
+	}
+
+	if ( gl_arMapPoints == Invalid_Array )
+	{
+		log_error( AMX_ERR_NATIVE, "[%s] Main Array is Invalid.", PluginPrefix );
 		return false;
 	}
 
@@ -568,8 +595,16 @@ public bool: native_get_all_points( const iPluginId, const iParamsCount )
 	return true;
 }
 
+public native_free_array( const iPluginId, const iParamsCount )
+{
+	if ( gl_arMapPoints == Invalid_Array )
+		return;
+
+	gl_iPointsCount = 0;
+	ArrayDestroy( gl_arMapPoints );
+}
+
 /* ~ [ Stocks ] ~ */
-/* -> Get player end eye position of aiming (w/o Trace) <- */
 stock UTIL_GetEyePointAiming( const pPlayer, const Float: flDistance, Vector3( vecEndPos ), const iIgnoreId = DONT_IGNORE_MONSTERS )
 {
 	new Vector3( vecStart ); UTIL_GetEyePosition( pPlayer, vecStart );
@@ -622,8 +657,7 @@ stock UTIL_PlaySound( const pPlayer, const szSoundPath[ ] )
 		client_cmd( pPlayer, "spk ^"%s^"", szSoundPath );
 }
 
-/* -> TE_BEAMPOINTS <- */
-stock UTIL_TE_BEAMPOINTS_DEBUG( const iDest, const pReceiver, const Vector3( vecOrigin ), const iLife, const iColor[ 3 ] )
+stock UTIL_TE_BEAMPOINTS_DEBUG( const iDest, const pReceiver, const Vector3( vecOrigin ), const iLife, const iColor[ ] )
 {
 	message_begin_f( iDest, SVC_TEMPENTITY, vecOrigin, pReceiver );
 	write_byte( TE_BEAMPOINTS );
@@ -647,7 +681,6 @@ stock UTIL_TE_BEAMPOINTS_DEBUG( const iDest, const pReceiver, const Vector3( vec
 	message_end( );
 }
 
-/* -> TE_IMPLOSION <- */
 stock UTIL_TE_IMPLOSION( const iDest, const pReceiver, const Vector3( vecOrigin ), const iRadius = 128, const iCount = 20, const iLife = 5 )
 {
 	message_begin_f( iDest, SVC_TEMPENTITY, vecOrigin, pReceiver );
@@ -661,7 +694,6 @@ stock UTIL_TE_IMPLOSION( const iDest, const pReceiver, const Vector3( vecOrigin 
 	message_end( );
 }
 
-/* -> TE_TELEPORT <- */
 stock UTIL_TE_TELEPORT( const iDest, const pReceiver, const Vector3( vecOrigin ), const Float: flUp = 0.0 )
 {
 	message_begin_f( iDest, SVC_TEMPENTITY, vecOrigin, pReceiver );
@@ -672,7 +704,6 @@ stock UTIL_TE_TELEPORT( const iDest, const pReceiver, const Vector3( vecOrigin )
 	message_end( );
 }
 
-/* -> Get player eye position <- */
 stock UTIL_GetEyePosition( const pPlayer, Vector3( vecEyeLevel ) )
 {
 	new Vector3( vecOrigin ); get_entvar( pPlayer, var_origin, vecOrigin );
@@ -681,7 +712,6 @@ stock UTIL_GetEyePosition( const pPlayer, Vector3( vecEyeLevel ) )
 	xs_vec_add( vecOrigin, vecViewOfs, vecEyeLevel );
 }
 
-/* -> Get Player vector Aiming <- */
 stock UTIL_GetVectorAiming( const pPlayer, Vector3( vecAiming ) ) 
 {
 	new Vector3( vecViewAngle ); get_entvar( pPlayer, var_v_angle, vecViewAngle );

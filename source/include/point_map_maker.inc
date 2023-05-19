@@ -11,10 +11,11 @@
  * @param szObjectName			Name of the object
  * 								If you specify "all", it will take into account all objects
  * 								If object is empty/invalid = automatically sets "general"
+ * @param bCheckPointIsFree     Check, point is free or not
  * 
  * @return						Returns 'true' if it got a random free point, otherwise 'false'
  */
-native bool: pmm_get_random_point( const Float: vecOrigin[ 3 ], const szObjectName[ ] = "general" );
+native bool: pmm_get_random_point( const Float: vecOrigin[ 3 ], const szObjectName[ ] = "general", const bool: bCheckPointIsFree = true );
 
 /**
  * Writes random points to your dynamic array.
@@ -37,6 +38,12 @@ native bool: pmm_get_random_points( const Array: arPoints, const iPointsCount, c
  * 								If you specify "all", it will take into account all objects
  * 								If object is empty/invalid = automatically sets "general"
  * 
- * @return						Returns 'true' if at least 1 point was written to the array, otherwise 'false'
+ * @return						Returns 'true' if at least 1 random point was written to the array, otherwise 'false'
  */
 native bool: pmm_get_all_points( const Array: arPoints, const szObjectName[ ] = "general" );
+
+/**
+ * Destroy the main array with all points.
+ * This native should be used if you have written down all the points you need somewhere in advance.
+ */
+native pmm_free_array( );
