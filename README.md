@@ -31,7 +31,7 @@ NB! In the next versions I will make Non-ReAPI support
 }
 ```
 
-- `"object1"` - This is the name of our object, followed by an array with all the points. In order to remove the dots from the object we need, we need to use the names of objects from the `json` file that is specified in `""`
+- `"object1"` - this is the name of our object, followed by an array with all the points. In order to get point from the object we need, we need to use the native with the name of the object from the `json` file, which is specified in `""`
 - `[*, *, *]` - One of our points
 
 ---
