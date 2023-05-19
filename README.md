@@ -15,6 +15,14 @@ NB! In the next versions I will make Non-ReAPI support
 
 ---
 
+### To-do List
+
+- [ ] Add `angles` to points
+- [ ] Add `CallBack` in native `pmm_get_random_point` for write "Custom Check of Point is Free or not"
+- [ ] Remove ReAPI support
+
+---
+
 ### Structure of .json file
 
 ```json
