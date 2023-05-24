@@ -3,47 +3,50 @@
 #endif
 #define _point_map_maker_included
 
-/**
- * Writes a random point to your variable.
- * NB! There is also a check on whether the point is currently free or not.
- * 
- * @param vecOrigin				Vector variable
- * @param szObjectName			Name of the object
- * 								If you specify "all", it will take into account all objects
- * 								If object is empty/invalid = automatically sets "general"
- * @param bCheckPointIsFree     Check, point is free or not
- * 
- * @return						Returns 'true' if it got a random free point, otherwise 'false'
- */
-native bool: pmm_get_random_point( const Float: vecOrigin[ 3 ], const szObjectName[ ] = "general", const bool: bCheckPointIsFree = true );
+const PMM_ALL_POINTS = -1;
 
 /**
- * Writes random points to your dynamic array.
+ * Get a point index or an array of point indexes into a dynamic array.
  * 
- * @param arPoints				Array handle
- * @param iPointsCount			Number of points
- * @param szObjectName			Name of the object
- * 								If you specify "all", it will take into account all objects
- * 								If object is empty/invalid = automatically sets "general"
+ * @param szObjectName				Name of the object
+ * 									If you specify "*" = find points from all objects
+ * 									If object is invalid name (can't find) = automatically sets "general" (first from ObjectNames)
+ * 									If object is empty = error
+ * @param iPointsCount				Count of points
+ * 									If PMM_ALL_POINTS (-1) = Get all points from Object
+ * @param bCheckPointIsFree			Check, point is free or not
+ * @param szCallBack				CallBack for bCheckPointIsFree. If this param is empty,
+ * 									you specify the name of your function, in which you check whether the point is free.
  * 
- * @return						Returns 'true' if at least 1 random point was written to the array, otherwise 'false'
+ * @note Use "" to use checking from the main plugin.
+ * @note Callback should be contains passing arguments as "public Point_CallBack(const Float:vecOrigin[3])"
+ * @note 'return true' for stop CallBack and 'return false' for continue CallBack.
+ * @note The callback will stop itself if the points have run out and will return -1.
+ * 
+ * @return                  		Returns integer if 'iPointsCount = 1', otherwise returns Array handle.
+ * 									If any error = return -1
  */
-native bool: pmm_get_random_points( const Array: arPoints, const iPointsCount, const szObjectName[ ] = "general" );
+native any: pmm_get_points( const szObjectName[ ] = "general", const iPointsCount = 1, const bool: bCheckPointIsFree = false, const szCallBack[ ] = "" );
 
 /**
- * Writes all points to your dynamic array
+ * Gets the origin and angles of your point index
  * 
- * @param arPoints				Array handle
- * @param szObjectName			Name of the object
- * 								If you specify "all", it will take into account all objects
- * 								If object is empty/invalid = automatically sets "general"
+ * @param iPointIndex				Point index
+ * @param vecOrigin					Array to store origin in
+ * @param vecAngles					Array to store angles in
  * 
- * @return						Returns 'true' if at least 1 random point was written to the array, otherwise 'false'
+ * @return							Returns true if it was possible to get the point data, otherwise false
  */
-native bool: pmm_get_all_points( const Array: arPoints, const szObjectName[ ] = "general" );
+native bool: pmm_get_point_data( const iPointIndex, const Float: vecOrigin[ 3 ], const Float: vecAngles[ 3 ] = { 0.0, 0.0, 0.0 } );
 
 /**
- * Destroy the main array with all points.
- * This native should be used if you have written down all the points you need somewhere in advance.
+ * Clears the specified object in the array
+ * 
+ * @param szObjectName				Name of the object
+ * 									If you specify "*" = find points from all objects
+ * 									If object is invalid name (can't find) = automatically sets "general"
+ * 									If object is empty = error
+ * 
+ * @return							Returns true if cleared the array of a specific object, otherwise false
  */
-native pmm_free_array( );
+native bool: pmm_clear_points( const szObjectName[ ] = "general" );
