@@ -195,7 +195,7 @@ if ( arPoints != Invalid_Array )
      * Next, we already make our own code
      */
 
-    // Не забываем уничтожить свой массив с точками
+    // Do not forget to destroy your array with points
     ArrayDestroy( arPoints );
 }
 
