@@ -102,3 +102,103 @@ native bool: pmm_get_point_data( const iPointIndex, const Float: vecOrigin[ 3 ],
  */
 native bool: pmm_clear_points( const szObjectName[ ] = "general" );
 ```
+
+---
+
+### Examples
+
+*Get random point*
+```Pawn
+new iPointIndex = pmm_get_points( "general", 1 );
+if ( iPointIndex == -1 )
+    return;
+
+new Float: vecOrigin[ 3 ];
+pmm_get_point_data( iPointIndex, vecOrigin );
+```
+
+*Get random point, with check, point is free*
+```Pawn
+new iPointIndex = pmm_get_points( "general", 1, true );
+if ( iPointIndex == -1 )
+    return;
+
+new Float: vecOrigin[ 3 ];
+pmm_get_point_data( iPointIndex, vecOrigin );
+```
+
+*Get random point, with custom callback*
+```Pawn
+{
+    // some code
+
+    new iPointIndex = pmm_get_points( "general", 1, true, "Point_CallBack" );
+    if ( iPointIndex == -1 )
+        return;
+
+    new Float: vecOrigin[ 3 ];
+    pmm_get_point_data( iPointIndex, vecOrigin );
+
+    // another code
+}
+
+public Point_CallBack( const Float: vecOrigin[ 3 ] )
+{
+    if ( vecOrigin[ 2 ] >= 128.0 )
+    {
+        // Point is fit
+        return true;
+    }
+
+    // The point does not fit - we take the next one
+    return false;
+}
+```
+
+*Get N random points from object*
+```Pawn
+new Array: arPoints = pmm_get_points( "market_place", 5 );
+if ( arPoints != Invalid_Array )
+{
+    /**
+     * In arPoints, we got 5 random points from the "market_place" object
+     * Next, we already make our own code
+     */
+
+    // Do not forget to destroy your array with points
+    ArrayDestroy( arPoints );
+}
+```
+
+*Get ALL points from ALL objects*
+```Pawn
+new Array: arPoints = pmm_get_points( "*", PMM_ALL_POINTS );
+if ( arPoints != Invalid_Array )
+{
+    /**
+     * In arPoints we got absolutely all points from all objects
+     * Next, we already make our own code
+     */
+
+    // Do not forget to destroy your array with points
+    ArrayDestroy( arPoints );
+}
+```
+
+*Get ALL points from object and then clearing the main array of points from the object we need*
+```Pawn
+new Array: arPoints = pmm_get_points( "presents", PMM_ALL_POINTS );
+if ( arPoints != Invalid_Array )
+{
+    /**
+     * In arPoints we got absolutely all points from the "presents" object
+     * Next, we already make our own code
+     */
+
+    // Не забываем уничтожить свой массив с точками
+    ArrayDestroy( arPoints );
+}
+
+// Clearing the main array from the points of the "presents" object
+pmm_clear_points( "presents" );
+```
