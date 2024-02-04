@@ -1,10 +1,11 @@
 public stock const PluginName[ ] =			"[AMXX] Addon: Point Map Maker";
-public stock const PluginVersion[ ] =		"1.0.3";
+public stock const PluginVersion[ ] =		"1.0.4";
 public stock const PluginAuthor[ ] =		"Yoshioka Haruki";
 
 /* ~ [ Includes ] ~ */
 #include <amxmodx>
 #include <fakemeta>
+#include <hamsandwich>
 #include <xs>
 #include <reapi>
 #include <json>
@@ -27,7 +28,7 @@ new const PluginSounds[ ][ ] = {
 }
 /**
  * The name of the objects for .json file.
- * When using native - specify one of these names. If the name is not found, "general" will be used
+ * When using native - specify one of these names. If the name is empty, "general" will be used
  * Add new ones AFTER "general"
  */
 new const ObjectNames[ ][ ] = {
@@ -45,6 +46,7 @@ new const GetPointAngle[ ][ ] = {
 	new const IgnoreEntitiesList[ ][ ] = {
 		"weaponbox", "armoury_entity", "grenade"
 	};
+	new Array: gl_arIgnoreEntites;
 #endif
 new const DebugBeamColors[ ][ ] = {
 	{ 255, 255, 255 }, // Not active object 
@@ -63,6 +65,10 @@ const TaskId_DebugPoints =					13250;
 	#define MAX_CONFIG_PATH_LENGHT			128
 #endif
 
+#if !defined BIT
+	#define BIT(%0)                         ( 1<<( %0 ) )
+#endif
+
 #define BIT_PLAYER(%0)						( BIT( %0 - 1 ) )
 #define BIT_SUB(%0,%1)						( %0 &= ~%1 )
 #define BIT_VALID(%0,%1)					( ( %0 & %1 ) == %1 )
@@ -70,6 +76,7 @@ const TaskId_DebugPoints =					13250;
 #define BIT_CLEAR(%0)						( %0 = 0 )
 
 #define IsNullString(%0)					bool: ( %0[ 0 ] == EOS )
+#define IsNullVector(%0)					bool: ( ( %0[ 0 ] + %0[ 1 ] + %0[ 2 ] ) == 0.0 )
 #define SetFormatex(%0,%1,%2)				( %1 = formatex( %0, charsmax( %0 ), %2 ) )
 #define AddFormatex(%0,%1,%2)				( %1 += formatex( %0[ %1 ], charsmax( %0 ) - %1, %2 ) )
 
@@ -109,6 +116,7 @@ enum {
 /* ~ [ AMX Mod X ] ~ */
 public plugin_natives( )
 {
+	register_native( "pmm_points_count", "native_points_count" );
 	register_native( "pmm_get_points", "native_get_points" );
 	register_native( "pmm_get_point_data", "native_get_point_data" );
 	register_native( "pmm_clear_points", "native_clear_points" );
@@ -120,7 +128,7 @@ public plugin_precache( )
 	gl_iszModelIndex_PointSprite = engfunc( EngFunc_PrecacheModel, PointSprite );
 
 	/* -> Create Array's <- */
-	gl_arMapPoints = ArrayCreate( ePointsData );
+	gl_arMapPoints = ArrayCreate( ePointsData, 1 );
 
 	/* -> Other <- */
 	get_mapname( gl_szMapName, charsmax( gl_szMapName ) );
@@ -135,6 +143,14 @@ public plugin_precache( )
 
 	JSON_Points_Load( gl_arMapPoints );
 	server_print( "[%s] Loaded %i points on ^"%s^"", PluginPrefix, gl_iPointsCount, gl_szMapName );
+
+#if defined EnableIgnoreList
+	new iArraySize = sizeof IgnoreEntitiesList;
+	gl_arIgnoreEntites = ArrayCreate( MAX_NAME_LENGTH, iArraySize );
+
+	for ( new i = 0; i < iArraySize; i++ )
+		ArrayPushString( gl_arIgnoreEntites, IgnoreEntitiesList[ i ] );
+#endif
 }
 
 public plugin_init( )
@@ -145,8 +161,7 @@ public plugin_init( )
 	register_dictionary( "point_map_maker.txt" );
 
 	/* -> Create Menus <- */
-	gl_aMenuData[ MenuData_MenuIndex ] = register_menuid( "MenuPointMaker_Show" );
-	register_menucmd( gl_aMenuData[ MenuData_MenuIndex ], MenuPointMaker_Buttons, "MenuPointMaker_Handler" );
+	register_menucmd( gl_aMenuData[ MenuData_MenuIndex ] = register_menuid( "MenuPointMaker_Show" ), MenuPointMaker_Buttons, "MenuPointMaker_Handler" );
 
 	/* -> Console Commands <- */
 	register_concmd( "amx_point_maker", "ConsoleCommand__PointMaker", ADMIN_RCON, "Open menu for create points." );
@@ -281,11 +296,11 @@ public MenuPointMaker_Handler( const pPlayer, const iMenuKey )
 				SendPlayerNotification( pPlayer, Sound_Error, "%l","PMM_Chat_NoPoints" );
 		}
 		case 2: {
-			if ( ++gl_aMenuData[ MenuData_ObjectNow ] && gl_aMenuData[ MenuData_ObjectNow ] >= sizeof ObjectNames )
+			if ( ++gl_aMenuData[ MenuData_ObjectNow ] >= sizeof ObjectNames )
 				gl_aMenuData[ MenuData_ObjectNow ] = 0;
 		}
 		case 3: {
-			if ( ++gl_aMenuData[ MenuData_AngleType ] && gl_aMenuData[ MenuData_AngleType ] >= sizeof GetPointAngle )
+			if ( ++gl_aMenuData[ MenuData_AngleType ] >= sizeof GetPointAngle )
 				gl_aMenuData[ MenuData_AngleType ] = 0;
 		}
 		case 6: {
@@ -332,8 +347,7 @@ public CTask__DebugPoints( const iTaskId )
 		return;
 	}
 
-	new aMenuData[ 2 ];
-	get_user_menu( pPlayer, aMenuData[ 0 ], aMenuData[ 1 ] );
+	new aMenuData[ 2 ]; get_user_menu( pPlayer, aMenuData[ 0 ], aMenuData[ 1 ] );
 	if ( aMenuData[ 0 ] != gl_aMenuData[ MenuData_MenuIndex ] )
 	{
 		BIT_SUB( gl_bitsUserShowAllPoints, BIT_PLAYER( pPlayer ) );
@@ -346,20 +360,23 @@ public CTask__DebugPoints( const iTaskId )
 	{
 		ArrayGetArray( gl_arMapPoints, i, aTempData );
 
+		if ( !ExecuteHamB( Ham_FVecVisible, pPlayer, aTempData[ PointOrigin ] ) )
+			continue;
+
 		xs_vec_copy( aTempData[ PointOrigin ], vecStart );
 		xs_vec_copy( vecStart, vecEnd );
 		vecEnd[ 2 ] -= 36.0;
 		
-		UTIL_TE_BEAMPOINTS_DEBUG( MSG_ONE_UNRELIABLE, pPlayer, vecStart, vecEnd, 10, DebugBeamColors[ equal( aTempData[ PointObjectName ], ObjectNames[ gl_aMenuData[ MenuData_ObjectNow ] ] ) ] );
+		UTIL_TE_BEAMPOINTS_DEBUG( MSG_ONE_UNRELIABLE, pPlayer, vecStart, vecEnd, 10, DebugBeamColors[ strcmp( aTempData[ PointObjectName ], ObjectNames[ gl_aMenuData[ MenuData_ObjectNow ] ] ) == 0 ] );
 
 		xs_vec_copy( aTempData[ PointAngles ], vecEnd );
-		if ( !xs_vec_equal( vecEnd, NULL_VECTOR ) )
-		{
-			angle_vector( vecEnd, ANGLEVECTOR_FORWARD, vecEnd );
-			xs_vec_add_scaled( vecStart, vecEnd, 16.0, vecEnd );
+		if ( IsNullVector( vecEnd ) )
+			continue;
 
-			UTIL_TE_BEAMPOINTS_DEBUG( MSG_ONE_UNRELIABLE, pPlayer, vecStart, vecEnd, 10, { 255, 0, 0 } );
-		}
+		angle_vector( vecEnd, ANGLEVECTOR_FORWARD, vecEnd );
+		xs_vec_add_scaled( vecStart, vecEnd, 16.0, vecEnd );
+
+		UTIL_TE_BEAMPOINTS_DEBUG( MSG_ONE_UNRELIABLE, pPlayer, vecStart, vecEnd, 10, { 255, 0, 0 } );
 	}
 }
 
@@ -489,6 +506,31 @@ _json_add_point_array( const JSON: JSON_ObjectHandle, const szValueName[ ], cons
 }
 
 /* ~ [ Natives ] ~ */
+public native_points_count( const iPluginId, const iParamsCount )
+{
+	enum { arg_object = 1 };
+
+	new szObjectName[ MAX_NAME_LENGTH ];
+	get_string( arg_object, szObjectName, charsmax( szObjectName ) );
+
+	if ( szObjectName[ 0 ] == '*' )
+		return gl_iPointsCount;
+
+	if ( ArrayFindString( gl_arMapPoints, szObjectName ) == -1 )
+		formatex( szObjectName, charsmax( szObjectName ), ObjectNames[ 0 ] );
+
+	new aTempData[ ePointsData ], iCount;
+	for ( new i; i < gl_iPointsCount; i++ )
+	{
+		ArrayGetArray( gl_arMapPoints, i, aTempData );
+		
+		if ( strcmp( aTempData[ PointObjectName ], szObjectName ) == 0 )
+			iCount += 1;
+	}
+
+	return iCount;
+}
+
 public any: native_get_points( const iPluginId, const iParamsCount )
 {
 	if ( !gl_iPointsCount )
@@ -532,7 +574,7 @@ public any: native_get_points( const iPluginId, const iParamsCount )
 	{
 		ArrayGetArray( gl_arMapPoints, i, aTempData );
 
-		if ( bFindFromAny || equal( aTempData[ PointObjectName ], szObjectName ) )
+		if ( bFindFromAny || strcmp( aTempData[ PointObjectName ], szObjectName ) == 0 )
 			ArrayPushCell( arTempPoints, i );
 	}
 
@@ -670,7 +712,7 @@ public bool: native_clear_points( const iPluginId, const iParamsCount )
 		{
 			ArrayGetArray( gl_arMapPoints, i, aTempData );
 
-			if ( equal( aTempData[ PointObjectName ], szObjectName ) )
+			if ( strcmp( aTempData[ PointObjectName ], szObjectName ) == 0 )
 				ArrayDeleteItem( gl_arMapPoints, i );
 		}
 
@@ -712,11 +754,9 @@ stock bool: IsPointFree( const Vector3( vecOrigin ) )
 	{
 	#if defined EnableIgnoreList
 		// Some default entities have SOLID_TRIGGER, so in order not to take them into account, we can skip them
-		for ( new i = 0, iIterations = sizeof IgnoreEntitiesList; i < iIterations; i++ )
-		{
-			if ( FClassnameIs( pEntity, IgnoreEntitiesList[ i ] ) )
-				return true;
-		}
+		new szClassName[ MAX_NAME_LENGTH ]; get_entvar( pEntity, var_classname, szClassName, charsmax( szClassName ) );
+		if ( ArrayFindString( gl_arIgnoreEntites, szClassName ) != -1 )
+			return true;
 	#endif
 
 		return false;

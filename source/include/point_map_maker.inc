@@ -6,6 +6,17 @@
 const PMM_ALL_POINTS = -1;
 
 /**
+ * Gets the number of points by the name of the object from the dynamic array.
+ * 
+ * @param szObjectName				Name of the object
+ * 									If you specify "*" = find points from all objects
+ * 									If object is invalid name (can't find) = automatically sets "general" (first from ObjectNames)
+ * 
+ * @return							Returns the number of points in the name of the object.
+ */
+native pmm_points_count( const szObjectName[ ] = "general" );
+
+/**
  * Get a point index or an array of point indexes into a dynamic array.
  * 
  * @param szObjectName				Name of the object
@@ -37,7 +48,7 @@ native any: pmm_get_points( const szObjectName[ ] = "general", const iPointsCoun
  * 
  * @return							Returns true if it was possible to get the point data, otherwise false
  */
-native bool: pmm_get_point_data( const iPointIndex, const Float: vecOrigin[ 3 ], const Float: vecAngles[ 3 ] = { 0.0, 0.0, 0.0 } );
+native bool: pmm_get_point_data( const iPointIndex, const Float: vecOrigin[ 3 ], const Float: vecAngles[ 3 ] = NULL_VECTOR );
 
 /**
  * Clears the specified object in the array
