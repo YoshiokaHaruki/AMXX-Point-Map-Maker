@@ -17,8 +17,8 @@ NB! In the next versions I will make Non-ReAPI support
 
 ### To-do List
 
-- [ ] Add `angles` to points
-- [ ] Add `CallBack` in native `pmm_get_random_point` for write "Custom Check of Point is Free or not"
+- [x] Add `angles` to points
+- [x] Add `CallBack` in native `pmm_get_random_point` for write "Custom Check of Point is Free or not"
 - [ ] Remove ReAPI support
 
 ---
@@ -28,67 +28,177 @@ NB! In the next versions I will make Non-ReAPI support
 ```json
 {
   "object1": [
-    [123, 456, 789],
-    [228, 322, 1337],
-    [987, 654, 321]
+    {
+      "origin": [ 255, 255, 255 ],
+      "angles": [ 255, 255, 255 ]
+    },
+    {
+      "origin": [ 123, 456, 789 ],
+      "angles": [ 0, 128, 0 ]
+    }
   ],
   "object2": [
-    [1, 2, 3],
-    [4, 5, 6]
+    {
+      "origin": [ 1, 2, 3 ],
+      "angles": [ 4, 5, 6 ]
+    }
   ]
 }
 ```
 
 - `"object1"` - this is the name of our object, followed by an array with all the points. In order to get point from the object we need, we need to use the native with the name of the object from the `json` file, which is specified in `""`
-- `[*, *, *]` - One of our points
+- `[*, *, *]` - Array with data
 
 ---
 
 ### Natives
 
 ```Pawn
-/**
- * Writes a random point to your variable.
- * NB! There is also a check on whether the point is currently free or not.
- * 
- * @param vecOrigin			Vector variable
- * @param szObjectName			Name of the object
- * 					If you specify "all", it will take into account all objects
- * 					If object is empty/invalid = automatically sets "general"
- * @param bCheckPointIsFree		Check, point is free or not
- * 
- * @return				Returns 'true' if it got a random free point, otherwise 'false'
- */
-native bool: pmm_get_random_point( const Float: vecOrigin[ 3 ], const szObjectName[ ] = "general", const bool: bCheckPointIsFree = true );
+const PMM_ALL_POINTS = -1;
 
 /**
- * Writes random points to your dynamic array.
+ * Get a point index or an array of point indexes into a dynamic array.
  * 
- * @param arPoints			Array handle
- * @param iPointsCount			Number of points
- * @param szObjectName			Name of the object
- * 					If you specify "all", it will take into account all objects
- * 					If object is empty/invalid = automatically sets "general"
+ * @param szObjectName				Name of the object
+ * 						If you specify "*" = find points from all objects
+ * 						If object is invalid name (can't find) = automatically sets "general" (first from ObjectNames)
+ * 						If object is empty = error
+ * @param iPointsCount				Count of points
+ * 						If PMM_ALL_POINTS (-1) = Get all points from Object
+ * @param bCheckPointIsFree			Check, point is free or not
+ * @param szCallBack				CallBack for bCheckPointIsFree. If this param is empty,
+ * 						you specify the name of your function, in which you check whether the point is free.
  * 
- * @return				Returns 'true' if at least 1 random point was written to the array, otherwise 'false'
+ * @note Use "" to use checking from the main plugin.
+ * @note Callback should be contains passing arguments as "public Point_CallBack(const Float:vecOrigin[3])"
+ * @note 'return true' for stop CallBack and 'return false' for continue CallBack.
+ * @note The callback will stop itself if the points have run out and will return -1.
+ * 
+ * @return                     			Returns integer if 'iPointsCount = 1', otherwise returns Array handle.
+ * 						If any error = return -1
  */
-native bool: pmm_get_random_points( const Array: arPoints, const iPointsCount, const szObjectName[ ] = "general" );
+native any: pmm_get_points( const szObjectName[ ] = "general", const iPointsCount = 1, const bool: bCheckPointIsFree = false, const szCallBack[ ] = "" );
 
 /**
- * Writes all points to your dynamic array.
+ * Gets the origin and angles of your point index
  * 
- * @param arPoints			Array handle
- * @param szObjectName			Name of the object
- * 					If you specify "all", it will take into account all objects
- * 					If object is empty/invalid = automatically sets "general"
+ * @param iPointIndex				Point index
+ * @param vecOrigin				Array to store origin in
+ * @param vecAngles				Array to store angles in
  * 
- * @return				Returns 'true' if at least 1 point was written to the array, otherwise 'false'
+ * @return					Returns true if it was possible to get the point data, otherwise false
  */
-native bool: pmm_get_all_points( const Array: arPoints, const szObjectName[ ] = "general" );
+native bool: pmm_get_point_data( const iPointIndex, const Float: vecOrigin[ 3 ], const Float: vecAngles[ 3 ] = { 0.0, 0.0, 0.0 } );
 
 /**
- * Destroy the main array with all points.
- * This native should be used if you have written down all the points you need somewhere in advance.
+ * Clears the specified object in the array
+ * 
+ * @param szObjectName				Name of the object
+ * 						If you specify "*" = find points from all objects
+ * 						If object is invalid name (can't find) = automatically sets "general"
+ * 						If object is empty = error
+ * 
+ * @return					Returns true if cleared the array of a specific object, otherwise false
  */
-native pmm_free_array( );
+native bool: pmm_clear_points( const szObjectName[ ] = "general" );
+```
+
+---
+
+### Examples
+
+*Get random point*
+```Pawn
+new iPointIndex = pmm_get_points( "general", 1 );
+if ( iPointIndex == -1 )
+    return;
+
+new Float: vecOrigin[ 3 ];
+pmm_get_point_data( iPointIndex, vecOrigin );
+```
+
+*Get random point, with check, point is free*
+```Pawn
+new iPointIndex = pmm_get_points( "general", 1, true );
+if ( iPointIndex == -1 )
+    return;
+
+new Float: vecOrigin[ 3 ];
+pmm_get_point_data( iPointIndex, vecOrigin );
+```
+
+*Get random point, with custom callback*
+```Pawn
+{
+    // some code
+
+    new iPointIndex = pmm_get_points( "general", 1, true, "Point_CallBack" );
+    if ( iPointIndex == -1 )
+        return;
+
+    new Float: vecOrigin[ 3 ];
+    pmm_get_point_data( iPointIndex, vecOrigin );
+
+    // another code
+}
+
+public Point_CallBack( const Float: vecOrigin[ 3 ] )
+{
+    if ( vecOrigin[ 2 ] >= 128.0 )
+    {
+        // Point is fit
+        return true;
+    }
+
+    // The point does not fit - we take the next one
+    return false;
+}
+```
+
+*Get N random points from object*
+```Pawn
+new Array: arPoints = pmm_get_points( "market_place", 5 );
+if ( arPoints != Invalid_Array )
+{
+    /**
+     * In arPoints, we got 5 random points from the "market_place" object
+     * Next, we already make our own code
+     */
+
+    // Do not forget to destroy your array with points
+    ArrayDestroy( arPoints );
+}
+```
+
+*Get ALL points from ALL objects*
+```Pawn
+new Array: arPoints = pmm_get_points( "*", PMM_ALL_POINTS );
+if ( arPoints != Invalid_Array )
+{
+    /**
+     * In arPoints we got absolutely all points from all objects
+     * Next, we already make our own code
+     */
+
+    // Do not forget to destroy your array with points
+    ArrayDestroy( arPoints );
+}
+```
+
+*Get ALL points from object and then clearing the main array of points from the object we need*
+```Pawn
+new Array: arPoints = pmm_get_points( "presents", PMM_ALL_POINTS );
+if ( arPoints != Invalid_Array )
+{
+    /**
+     * In arPoints we got absolutely all points from the "presents" object
+     * Next, we already make our own code
+     */
+
+    // Do not forget to destroy your array with points
+    ArrayDestroy( arPoints );
+}
+
+// Clearing the main array from the points of the "presents" object
+pmm_clear_points( "presents" );
 ```
