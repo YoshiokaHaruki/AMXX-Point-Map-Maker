@@ -57,6 +57,17 @@ NB! In the next versions I will make Non-ReAPI support
 const PMM_ALL_POINTS = -1;
 
 /**
+ * Gets the number of points by the name of the object from the dynamic array.
+ * 
+ * @param szObjectName				Name of the object
+ * 						If you specify "*" = find points from all objects
+ * 						If object is invalid name (can't find) = automatically sets "general" (first from ObjectNames)
+ * 
+ * @return					Returns the number of points in the name of the object.
+ */
+native pmm_points_count( const szObjectName[ ] = "general" );
+
+/**
  * Get a point index or an array of point indexes into a dynamic array.
  * 
  * @param szObjectName				Name of the object
@@ -201,4 +212,26 @@ if ( arPoints != Invalid_Array )
 
 // Clearing the main array from the points of the "presents" object
 pmm_clear_points( "presents" );
+```
+
+*Get the number of ALL available points*
+```Pawn
+{
+	// some code
+
+	new iPointsCount = pmm_points_count( "*" );
+
+	// some code
+}
+```
+
+*Get the number of points in an object*
+```Pawn
+{
+	// some code
+
+	new iPointsCount = pmm_points_count( "presents" );
+
+	// some code
+}
 ```
