@@ -1,5 +1,5 @@
 public stock const PluginName[ ] =			"[AMXX] Addon: Point Map Maker";
-public stock const PluginVersion[ ] =		"1.0.4";
+public stock const PluginVersion[ ] =		"1.0.5";
 public stock const PluginAuthor[ ] =		"Yoshioka Haruki";
 
 /* ~ [ Includes ] ~ */
@@ -26,17 +26,10 @@ new const PluginSounds[ ][ ] = {
 	"sound/buttons/blip2.wav", // Negative Notification
 	"sound/buttons/button2.wav" // Error
 }
-/**
- * The name of the objects for .json file.
- * When using native - specify one of these names. If the name is empty, "general" will be used
- * Add new ones AFTER "general"
- */
-new const ObjectNames[ ][ ] = {
-	"general", "presents", "market_place"
-};
 new const GetPointAngle[ ][ ] = {
 	"var_angles", "var_v_angle", "NULL_VECTOR"
 };
+
 #define EnableIgnoreList
 #if defined EnableIgnoreList
 	/**
@@ -48,10 +41,12 @@ new const GetPointAngle[ ][ ] = {
 	};
 	new Array: gl_arIgnoreEntites;
 #endif
+
 new const DebugBeamColors[ ][ ] = {
 	{ 255, 255, 255 }, // Not active object 
 	{ 0, 255, 0 } // Active object
 }
+
 const Float: NearOriginDistance =			64.0; // Maximum distance when removing a point
 const MenuPointMaker_Buttons =				( MENU_KEY_1|MENU_KEY_2|MENU_KEY_3|MENU_KEY_4|MENU_KEY_7|MENU_KEY_8|MENU_KEY_9|MENU_KEY_0 );
 const TaskId_DebugPoints =					13250;
@@ -82,6 +77,8 @@ const TaskId_DebugPoints =					13250;
 
 /* ~ [ Params ] ~ */
 new gl_iPointsCount;
+new gl_iObjectsCount;
+new Array: gl_arObjectsNames;
 new gl_bitsUserShowAllPoints;
 new gl_iszModelIndex_PointSprite;
 new gl_szMapName[ MAX_NAME_LENGTH ];
@@ -116,6 +113,7 @@ enum {
 /* ~ [ AMX Mod X ] ~ */
 public plugin_natives( )
 {
+	register_native( "pmm_init_object", "native_init_object" );
 	register_native( "pmm_points_count", "native_points_count" );
 	register_native( "pmm_get_points", "native_get_points" );
 	register_native( "pmm_get_point_data", "native_get_point_data" );
@@ -128,29 +126,27 @@ public plugin_precache( )
 	gl_iszModelIndex_PointSprite = engfunc( EngFunc_PrecacheModel, PointSprite );
 
 	/* -> Create Array's <- */
-	gl_arMapPoints = ArrayCreate( ePointsData, 1 );
+	gl_arMapPoints = ArrayCreate( ePointsData, 0 );
+	gl_arObjectsNames = ArrayCreate( MAX_NAME_LENGTH, 0 );
 
-	/* -> Other <- */
-	get_mapname( gl_szMapName, charsmax( gl_szMapName ) );
+	/* -> Push default Object Name <- */
+	ArrayPushString( gl_arObjectsNames, "general" );
 
-	get_localinfo( "amxx_configsdir", gl_szFilePath, charsmax( gl_szFilePath ) );
-	strcat( gl_szFilePath, MainFolder, charsmax( gl_szFilePath ) );
+	/* -> Call pre forward <- */
+	new iForwardId;
 
-	if ( !dir_exists( gl_szFilePath ) )
-		mkdir( gl_szFilePath );
+	ExecuteForward( iForwardId = CreateMultiForward( "pmm_load_data_pre", ET_IGNORE ), _ );
+	DestroyForward( iForwardId );
 
-	strcat( gl_szFilePath, fmt( "/%s.json", gl_szMapName ), charsmax( gl_szFilePath ) );
+	/* -> Start Load Data <- */
+	fnStartLoadData( );
 
-	JSON_Points_Load( gl_arMapPoints );
-	server_print( "[%s] Loaded %i points on ^"%s^"", PluginPrefix, gl_iPointsCount, gl_szMapName );
+	/* -> Call post forward <- */
+	ExecuteForward( iForwardId = CreateMultiForward( "pmm_load_data_post", ET_IGNORE ), _ );
+	DestroyForward( iForwardId );
 
-#if defined EnableIgnoreList
-	new iArraySize = sizeof IgnoreEntitiesList;
-	gl_arIgnoreEntites = ArrayCreate( MAX_NAME_LENGTH, iArraySize );
-
-	for ( new i = 0; i < iArraySize; i++ )
-		ArrayPushString( gl_arIgnoreEntites, IgnoreEntitiesList[ i ] );
-#endif
+	/* -> Cache objects count <- */
+	gl_iObjectsCount = ArraySize( gl_arObjectsNames );
 }
 
 public plugin_init( )
@@ -221,7 +217,11 @@ public MenuPointMaker_Show( const pPlayer )
 
 	AddFormatex( szBuffer, iLen, "\y1. \w%l^n", "PMM_Menu_AddPoint" );
 	AddFormatex( szBuffer, iLen, "\y2. \w%l^n", "PMM_Menu_RemovePoint" );
-	AddFormatex( szBuffer, iLen, "\y3. \w%l^n", "PMM_Menu_SwitchObject", ObjectNames[ gl_aMenuData[ MenuData_ObjectNow ] ] );
+
+	new szObjectName[ MAX_NAME_LENGTH ];
+	ArrayGetString( gl_arObjectsNames, gl_aMenuData[ MenuData_ObjectNow ], szObjectName, charsmax( szObjectName ) );
+
+	AddFormatex( szBuffer, iLen, "\y3. \w%l^n", "PMM_Menu_SwitchObject", szObjectName );
 	AddFormatex( szBuffer, iLen, "\y4. \w%l^n", "PMM_Menu_PointAngle", GetPointAngle[ gl_aMenuData[ MenuData_AngleType ] ] );
 	AddFormatex( szBuffer, iLen, "^n\y7. \w%l^n", "PMM_Menu_ShowPoints", BIT_VALID( gl_bitsUserShowAllPoints, BIT_PLAYER( pPlayer ) ) ? "\yON\d" : "OFF" );
 	AddFormatex( szBuffer, iLen, "^n\y8. \w%l^n", "PMM_Menu_RemovePoints" );
@@ -238,7 +238,7 @@ public MenuPointMaker_Handler( const pPlayer, const iMenuKey )
 	switch ( iMenuKey ) {
 		case 0: {
 			new aTempData[ ePointsData ];
-			copy( aTempData[ PointObjectName ], charsmax( aTempData[ PointObjectName ] ), ObjectNames[ gl_aMenuData[ MenuData_ObjectNow ] ] );
+			ArrayGetString( gl_arObjectsNames, gl_aMenuData[ MenuData_ObjectNow ], aTempData[ PointObjectName ], charsmax( aTempData[ PointObjectName ] ) );
 
 			get_entvar( pPlayer, var_origin, aTempData[ PointOrigin ] );
 
@@ -296,7 +296,7 @@ public MenuPointMaker_Handler( const pPlayer, const iMenuKey )
 				SendPlayerNotification( pPlayer, Sound_Error, "%l","PMM_Chat_NoPoints" );
 		}
 		case 2: {
-			if ( ++gl_aMenuData[ MenuData_ObjectNow ] >= sizeof ObjectNames )
+			if ( ++gl_aMenuData[ MenuData_ObjectNow ] >= gl_iObjectsCount )
 				gl_aMenuData[ MenuData_ObjectNow ] = 0;
 		}
 		case 3: {
@@ -356,6 +356,9 @@ public CTask__DebugPoints( const iTaskId )
 		return;
 	}
 
+	new szObjectName[ MAX_NAME_LENGTH ];
+	ArrayGetString( gl_arObjectsNames, gl_aMenuData[ MenuData_ObjectNow ], szObjectName, charsmax( szObjectName ) );
+
 	for ( new i = 0, aTempData[ ePointsData ], Vector3( vecStart ), Vector3( vecEnd ); i < gl_iPointsCount; i++ )
 	{
 		ArrayGetArray( gl_arMapPoints, i, aTempData );
@@ -367,7 +370,7 @@ public CTask__DebugPoints( const iTaskId )
 		xs_vec_copy( vecStart, vecEnd );
 		vecEnd[ 2 ] -= 36.0;
 		
-		UTIL_TE_BEAMPOINTS_DEBUG( MSG_ONE_UNRELIABLE, pPlayer, vecStart, vecEnd, 10, DebugBeamColors[ strcmp( aTempData[ PointObjectName ], ObjectNames[ gl_aMenuData[ MenuData_ObjectNow ] ] ) == 0 ] );
+		UTIL_TE_BEAMPOINTS_DEBUG( MSG_ONE_UNRELIABLE, pPlayer, vecStart, vecEnd, 10, DebugBeamColors[ strcmp( aTempData[ PointObjectName ], szObjectName ) == 0 ] );
 
 		xs_vec_copy( aTempData[ PointAngles ], vecEnd );
 		if ( IsNullVector( vecEnd ) )
@@ -400,14 +403,19 @@ public JSON_Points_Load( const Array: arHandle )
 		return;
 	}
 
+
 	new iJsonArraySize;
+	new aTempData[ ePointsData ];
 	new JSON: JSON_ObjectHandle = Invalid_JSON;
 	new JSON: JSON_PointHandle = Invalid_JSON;
-	new aTempData[ ePointsData ];
 
 	for ( new i, j; i < iJsonHandleSize; i++ )
 	{
 		json_object_get_name( JSON_Handle, i, aTempData[ PointObjectName ], charsmax( aTempData[ PointObjectName ] ) );
+
+		// Can't find object name
+		if ( ArrayFindString( gl_arObjectsNames, aTempData[ PointObjectName ] ) == -1 )
+			continue;
 
 		JSON_ObjectHandle = json_object_get_value( JSON_Handle, aTempData[ PointObjectName ] );
 		if ( JSON_ObjectHandle != Invalid_JSON )
@@ -505,7 +513,49 @@ _json_add_point_array( const JSON: JSON_ObjectHandle, const szValueName[ ], cons
 	}
 }
 
+fnStartLoadData( )
+{
+	/* -> Start Parse <- */
+	get_mapname( gl_szMapName, charsmax( gl_szMapName ) );
+
+	get_localinfo( "amxx_configsdir", gl_szFilePath, charsmax( gl_szFilePath ) );
+	strcat( gl_szFilePath, MainFolder, charsmax( gl_szFilePath ) );
+
+	if ( !dir_exists( gl_szFilePath ) )
+		mkdir( gl_szFilePath );
+
+	strcat( gl_szFilePath, fmt( "/%s.json", gl_szMapName ), charsmax( gl_szFilePath ) );
+
+	JSON_Points_Load( gl_arMapPoints );
+	server_print( "[%s] Loaded %i points on ^"%s^"", PluginPrefix, gl_iPointsCount, gl_szMapName );
+
+#if defined EnableIgnoreList
+	/* -> Add Ignore list <- */
+	new iArraySize = sizeof IgnoreEntitiesList;
+	gl_arIgnoreEntites = ArrayCreate( MAX_NAME_LENGTH, iArraySize );
+
+	for ( new i = 0; i < iArraySize; i++ )
+		ArrayPushString( gl_arIgnoreEntites, IgnoreEntitiesList[ i ] );
+#endif
+}
+
 /* ~ [ Natives ] ~ */
+public bool: native_init_object( const iPluginId, const iParamsCount )
+{
+	enum { arg_object = 1 };
+
+	new szObjectName[ MAX_NAME_LENGTH ];
+	get_string( arg_object, szObjectName, charsmax( szObjectName ) );
+
+	if ( IsNullString( szObjectName ) )
+		return false;
+
+	if ( ArrayFindString( gl_arObjectsNames, szObjectName ) == -1 )
+		ArrayPushString( gl_arObjectsNames, szObjectName );
+
+	return true;
+}
+
 public native_points_count( const iPluginId, const iParamsCount )
 {
 	enum { arg_object = 1 };
@@ -517,7 +567,7 @@ public native_points_count( const iPluginId, const iParamsCount )
 		return gl_iPointsCount;
 
 	if ( ArrayFindString( gl_arMapPoints, szObjectName ) == -1 )
-		formatex( szObjectName, charsmax( szObjectName ), ObjectNames[ 0 ] );
+		return 0;
 
 	new aTempData[ ePointsData ], iCount;
 	for ( new i; i < gl_iPointsCount; i++ )
@@ -563,12 +613,15 @@ public any: native_get_points( const iPluginId, const iParamsCount )
 		return -1;
 	}
 
-	new bool: bFindFromAny = bool: ( szObjectName[ 0 ] == '*' );
-	if ( !bFindFromAny && ArrayFindString( gl_arMapPoints, szObjectName ) == -1 )
-		formatex( szObjectName, charsmax( szObjectName ), ObjectNames[ 0 ] );
+	if ( ArrayFindString( gl_arObjectsNames, szObjectName ) == -1 )
+	{
+		log_error( AMX_ERR_NATIVE, "[%s] Could not be found object with name^"%s^".", PluginPrefix, szObjectName );
+		return -1;
+	}
 
 	new aTempData[ ePointsData ];
 	new Array: arTempPoints = ArrayCreate( .reserved = 0 );
+	new bool: bFindFromAny = bool: ( szObjectName[ 0 ] == '*' );
 
 	for ( new i; i < gl_iPointsCount; i++ )
 	{
@@ -601,7 +654,7 @@ public any: native_get_points( const iPluginId, const iParamsCount )
 			new szCallBack[ MAX_NAME_LENGTH ];
 			get_string( arg_callback, szCallBack, charsmax( szCallBack ) );
 
-			new fwCallBack, iReturnForward = false;
+			new fwCallBack, iReturnForward;
 			if ( !IsNullString( szCallBack ) )
 				fwCallBack = CreateOneForward( iPluginId, szCallBack, FP_ARRAY );
 
@@ -622,13 +675,13 @@ public any: native_get_points( const iPluginId, const iParamsCount )
 
 				if ( fwCallBack )
 				{
-					ExecuteForward( fwCallBack, iReturnForward, PrepareArray( any: vecOrigin, 3 ) );
+					ExecuteForward( fwCallBack, iReturnForward, PrepareArray( _: vecOrigin, 3 ) );
 
-					if ( iReturnForward )
+					if ( iReturnForward > 0 )
 						break;
 				}
 			}
-			while ( fwCallBack && !iReturnForward || !fwCallBack && !IsPointFree( vecOrigin ) )
+			while ( fwCallBack && iReturnForward <= 0 || !fwCallBack && !IsPointFree( vecOrigin ) )
 
 			if ( fwCallBack )
 				DestroyForward( fwCallBack );

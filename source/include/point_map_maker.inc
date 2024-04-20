@@ -6,11 +6,34 @@
 const PMM_ALL_POINTS = -1;
 
 /**
+ * The forward is called before parsing the points on the map.
+ * Use this forward to add your own object using the native 'pmm_init_object'.
+ */
+forward pmm_load_data_pre( );
+
+/**
+ * The forward is called after the parsing of all points on the map has ended.
+ * In this forward, you can cache all your points locally for the plugin,
+ * so as not to constantly use the natives of the 'Point Map Maker' plugin during the game.
+ */
+forward pmm_load_data_post( );
+
+/**
+ * Add your own object, which will be taken into account when parsing all points on the map.
+ * Use this in the forward 'pmm_load_data_pre'.
+ * 
+ * @param szObjectName				Name of the new object
+ * 
+ * @return							Returns true if a new object has been added, otherwise false
+ */
+native bool: pmm_init_object( const szObjectName[ ] );
+
+/**
  * Gets the number of points by the name of the object from the dynamic array.
  * 
  * @param szObjectName				Name of the object
  * 									If you specify "*" = find points from all objects
- * 									If object is invalid name (can't find) = automatically sets "general" (first from ObjectNames)
+ * 									If object is invalid name (can't find) = return 0
  * 
  * @return							Returns the number of points in the name of the object.
  */
@@ -21,8 +44,7 @@ native pmm_points_count( const szObjectName[ ] = "general" );
  * 
  * @param szObjectName				Name of the object
  * 									If you specify "*" = find points from all objects
- * 									If object is invalid name (can't find) = automatically sets "general" (first from ObjectNames)
- * 									If object is empty = error
+ * 									If object is empty or invalid name (can't find) = error
  * @param iPointsCount				Count of points
  * 									If PMM_ALL_POINTS (-1) = Get all points from Object
  * @param bCheckPointIsFree			Check, point is free or not
@@ -35,6 +57,7 @@ native pmm_points_count( const szObjectName[ ] = "general" );
  * @note The callback will stop itself if the points have run out and will return -1.
  * 
  * @return                  		Returns integer if 'iPointsCount = 1', otherwise returns Array handle.
+ * 									When returning the Array handle, use 'ArrayDestroy()' after your actions
  * 									If any error = return -1
  */
 native any: pmm_get_points( const szObjectName[ ] = "general", const iPointsCount = 1, const bool: bCheckPointIsFree = false, const szCallBack[ ] = "" );
@@ -55,8 +78,6 @@ native bool: pmm_get_point_data( const iPointIndex, const Float: vecOrigin[ 3 ],
  * 
  * @param szObjectName				Name of the object
  * 									If you specify "*" = find points from all objects
- * 									If object is invalid name (can't find) = automatically sets "general"
- * 									If object is empty = error
  * 
  * @return							Returns true if cleared the array of a specific object, otherwise false
  */
