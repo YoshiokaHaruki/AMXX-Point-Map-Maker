@@ -1,5 +1,5 @@
 public stock const PluginName[ ] =			"[AMXX] Addon: Point Map Maker";
-public stock const PluginVersion[ ] =		"1.0.6";
+public stock const PluginVersion[ ] =		"1.0.7";
 public stock const PluginAuthor[ ] =		"Yoshioka Haruki";
 
 /* ~ [ Includes ] ~ */
@@ -27,7 +27,7 @@ new const PluginSounds[ ][ ] = {
 	"sound/buttons/button2.wav" // Error
 }
 new const GetPointAngle[ ][ ] = {
-	"var_angles", "var_v_angle", "NULL_VECTOR"
+	"NULL_VECTOR", "var_angles", "var_v_angle"
 };
 
 #define EnableIgnoreList
@@ -79,6 +79,7 @@ const TaskId_DebugPoints =					13250;
 new gl_iPointsCount;
 new gl_iObjectsCount;
 new Array: gl_arObjectsNames;
+new gl_pMenuIndex_PointMaker;
 new gl_bitsUserShowAllPoints;
 new gl_iszModelIndex_PointSprite;
 new gl_szMapName[ MAX_NAME_LENGTH ];
@@ -92,11 +93,10 @@ enum ePointsData {
 new Array: gl_arMapPoints;
 
 enum eMenuData {
-	MenuData_MenuIndex,
 	MenuData_ObjectNow,
 	MenuData_AngleType
 };
-new gl_aMenuData[ eMenuData ];
+new gl_aMenuData[ MAX_PLAYERS + 1 ][ eMenuData ];
 
 enum {
 	Sound_Positive,
@@ -105,9 +105,9 @@ enum {
 };
 
 enum {
+	AngleType_NULL_VECTOR,
 	AngleType_var_angles,
-	AngleType_var_v_angle,
-	AngleType_NULL_VECTOR
+	AngleType_var_v_angle
 };
 
 /* ~ [ AMX Mod X ] ~ */
@@ -157,7 +157,7 @@ public plugin_init( )
 	register_dictionary( "point_map_maker.txt" );
 
 	/* -> Create Menus <- */
-	register_menucmd( gl_aMenuData[ MenuData_MenuIndex ] = register_menuid( "MenuPointMaker_Show" ), MenuPointMaker_Buttons, "MenuPointMaker_Handler" );
+	register_menucmd( gl_pMenuIndex_PointMaker = register_menuid( "MenuPointMaker_Show" ), MenuPointMaker_Buttons, "MenuPointMaker_Handler" );
 
 	/* -> Console Commands <- */
 	register_concmd( "amx_point_maker", "ConsoleCommand__PointMaker", ADMIN_RCON, "Open menu for create points." );
@@ -176,6 +176,7 @@ public plugin_init( )
 public client_disconnected( pPlayer )
 {
 	BIT_SUB( gl_bitsUserShowAllPoints, BIT_PLAYER( pPlayer ) );
+	arrayset( gl_aMenuData[ pPlayer ], 0, eMenuData );
 }
 
 /* ~ [ Other ] ~ */
@@ -201,6 +202,8 @@ public SendPlayerNotification( const pPlayer, const iSoundIndex, const szMessage
 	new szBuffer[ MAX_PRINT_LENGTH ];
 	vformat( szBuffer, MAX_PRINT_LENGTH - 1, szMessage, 4 );
 
+	SetGlobalTransTarget( pPlayer );
+
 	UTIL_PlaySound( pPlayer, PluginSounds[ iSoundIndex ] );
 	client_print_color( pPlayer, print_team_default, "^4[%s]^1 %s", PluginPrefix, szBuffer );
 }
@@ -213,16 +216,18 @@ public MenuPointMaker_Show( const pPlayer )
 
 	new szBuffer[ MAX_MENU_LENGTH ], iLen;
 
+	SetGlobalTransTarget( pPlayer );
+
 	SetFormatex( szBuffer, iLen, "%l^n^n", "PMM_Menu_Title", gl_szMapName, gl_iPointsCount );
 
 	AddFormatex( szBuffer, iLen, "\y1. \w%l^n", "PMM_Menu_AddPoint" );
 	AddFormatex( szBuffer, iLen, "\y2. \w%l^n", "PMM_Menu_RemovePoint" );
 
 	new szObjectName[ MAX_NAME_LENGTH ];
-	ArrayGetString( gl_arObjectsNames, gl_aMenuData[ MenuData_ObjectNow ], szObjectName, charsmax( szObjectName ) );
+	ArrayGetString( gl_arObjectsNames, gl_aMenuData[ pPlayer ][ MenuData_ObjectNow ], szObjectName, charsmax( szObjectName ) );
 
 	AddFormatex( szBuffer, iLen, "\y3. \w%l^n", "PMM_Menu_SwitchObject", szObjectName );
-	AddFormatex( szBuffer, iLen, "\y4. \w%l^n", "PMM_Menu_PointAngle", GetPointAngle[ gl_aMenuData[ MenuData_AngleType ] ] );
+	AddFormatex( szBuffer, iLen, "\y4. \w%l^n", "PMM_Menu_PointAngle", GetPointAngle[ gl_aMenuData[ pPlayer ][ MenuData_AngleType ] ] );
 	AddFormatex( szBuffer, iLen, "^n\y7. \w%l^n", "PMM_Menu_ShowPoints", BIT_VALID( gl_bitsUserShowAllPoints, BIT_PLAYER( pPlayer ) ) ? "\yON\d" : "OFF" );
 	AddFormatex( szBuffer, iLen, "^n\y8. \w%l^n", "PMM_Menu_RemovePoints" );
 	AddFormatex( szBuffer, iLen, "\y9. \w%l^n", "PMM_Menu_SavePoints" );
@@ -238,14 +243,14 @@ public MenuPointMaker_Handler( const pPlayer, const iMenuKey )
 	switch ( iMenuKey ) {
 		case 0: {
 			new aTempData[ ePointsData ];
-			ArrayGetString( gl_arObjectsNames, gl_aMenuData[ MenuData_ObjectNow ], aTempData[ PointObjectName ], charsmax( aTempData[ PointObjectName ] ) );
+			ArrayGetString( gl_arObjectsNames, gl_aMenuData[ pPlayer ][ MenuData_ObjectNow ], aTempData[ PointObjectName ], charsmax( aTempData[ PointObjectName ] ) );
 
 			get_entvar( pPlayer, var_origin, aTempData[ PointOrigin ] );
 
-			if ( gl_aMenuData[ MenuData_AngleType ] == AngleType_NULL_VECTOR )
+			if ( gl_aMenuData[ pPlayer ][ MenuData_AngleType ] == AngleType_NULL_VECTOR )
 				xs_vec_copy( NULL_VECTOR, aTempData[ PointAngles ] );
 			else
-				get_entvar( pPlayer, ( gl_aMenuData[ MenuData_AngleType ] == AngleType_var_angles ) ? var_angles : var_v_angle, aTempData[ PointAngles ] );
+				get_entvar( pPlayer, ( gl_aMenuData[ pPlayer ][ MenuData_AngleType ] == AngleType_var_angles ) ? var_angles : var_v_angle, aTempData[ PointAngles ] );
 
 			ArrayPushArray( gl_arMapPoints, aTempData );
 			gl_iPointsCount++;
@@ -296,12 +301,12 @@ public MenuPointMaker_Handler( const pPlayer, const iMenuKey )
 				SendPlayerNotification( pPlayer, Sound_Error, "%l","PMM_Chat_NoPoints" );
 		}
 		case 2: {
-			if ( ++gl_aMenuData[ MenuData_ObjectNow ] >= gl_iObjectsCount )
-				gl_aMenuData[ MenuData_ObjectNow ] = 0;
+			if ( ++gl_aMenuData[ pPlayer ][ MenuData_ObjectNow ] >= gl_iObjectsCount )
+				gl_aMenuData[ pPlayer ][ MenuData_ObjectNow ] = 0;
 		}
 		case 3: {
-			if ( ++gl_aMenuData[ MenuData_AngleType ] >= sizeof GetPointAngle )
-				gl_aMenuData[ MenuData_AngleType ] = 0;
+			if ( ++gl_aMenuData[ pPlayer ][ MenuData_AngleType ] >= sizeof GetPointAngle )
+				gl_aMenuData[ pPlayer ][ MenuData_AngleType ] = 0;
 		}
 		case 6: {
 			if ( gl_iPointsCount )
@@ -348,7 +353,7 @@ public CTask__DebugPoints( const iTaskId )
 	}
 
 	new aMenuData[ 2 ]; get_user_menu( pPlayer, aMenuData[ 0 ], aMenuData[ 1 ] );
-	if ( aMenuData[ 0 ] != gl_aMenuData[ MenuData_MenuIndex ] )
+	if ( aMenuData[ 0 ] != gl_pMenuIndex_PointMaker )
 	{
 		BIT_SUB( gl_bitsUserShowAllPoints, BIT_PLAYER( pPlayer ) );
 		remove_task( iTaskId );
@@ -357,13 +362,13 @@ public CTask__DebugPoints( const iTaskId )
 	}
 
 	new szObjectName[ MAX_NAME_LENGTH ];
-	ArrayGetString( gl_arObjectsNames, gl_aMenuData[ MenuData_ObjectNow ], szObjectName, charsmax( szObjectName ) );
+	ArrayGetString( gl_arObjectsNames, gl_aMenuData[ pPlayer ][ MenuData_ObjectNow ], szObjectName, charsmax( szObjectName ) );
 
 	for ( new i = 0, aTempData[ ePointsData ], Vector3( vecStart ), Vector3( vecEnd ); i < gl_iPointsCount; i++ )
 	{
 		ArrayGetArray( gl_arMapPoints, i, aTempData );
 
-		if ( !ExecuteHamB( Ham_FVecVisible, pPlayer, aTempData[ PointOrigin ] ) )
+		if ( !ExecuteHam( Ham_FVecVisible, pPlayer, aTempData[ PointOrigin ] ) )
 			continue;
 
 		xs_vec_copy( aTempData[ PointOrigin ], vecStart );
