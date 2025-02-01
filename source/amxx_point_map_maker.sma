@@ -1,5 +1,5 @@
 public stock const PluginName[ ] =			"[AMXX] Addon: Point Map Maker";
-public stock const PluginVersion[ ] =		"1.0.5";
+public stock const PluginVersion[ ] =		"1.0.6";
 public stock const PluginAuthor[ ] =		"Yoshioka Haruki";
 
 /* ~ [ Includes ] ~ */
@@ -61,7 +61,7 @@ const TaskId_DebugPoints =					13250;
 #endif
 
 #if !defined BIT
-	#define BIT(%0)                         ( 1<<( %0 ) )
+	#define BIT(%0)							( 1<<( %0 ) )
 #endif
 
 #define BIT_PLAYER(%0)						( BIT( %0 - 1 ) )
@@ -187,7 +187,7 @@ public ConsoleCommand__PointMaker( const pCaller, const bitsFlags )
 		return PLUGIN_HANDLED;
 	}
 
-	if ( ~get_user_flags( pCaller ) & bitsFlags )
+	if ( ( get_user_flags( pCaller ) & bitsFlags) != bitsFlags )
 		return PLUGIN_HANDLED;
 
 	MenuPointMaker_Show( pCaller );
@@ -450,19 +450,49 @@ public JSON_Points_Save( const Array: arHandle )
 		return;
 	}
 
-	new JSON: JSON_Handle = json_init_object( );
+	new JSON: JSON_Handle = Invalid_JSON;
 	new JSON: JSON_ObjectHandle = Invalid_JSON;
 	new JSON: JSON_PointHandle = Invalid_JSON;
 	new aTempData[ ePointsData ];
+	new Array: Array_LocalCache = ArrayCreate( 64, 1 );
+
+	if ( file_exists( gl_szFilePath ) )
+	{
+		JSON_Handle = json_parse(gl_szFilePath, true);
+
+		if ( JSON_Handle == Invalid_JSON)
+		{
+			log_error( AMX_ERR_NATIVE, "[%s] Failed to load existing JSON file.", PluginPrefix );
+			return;
+		}
+	}
+	else
+	{
+		JSON_Handle = json_init_object();
+	}
 
 	for ( new i; i < gl_iPointsCount; i++ )
 	{
 		ArrayGetArray( arHandle, i, aTempData );
 
-		if ( !json_object_has_value( JSON_Handle, aTempData[ PointObjectName ], JSONArray ) )
-			JSON_ObjectHandle = json_init_array( );
+		if ( json_object_has_value( JSON_Handle, aTempData[ PointObjectName ], JSONArray ) )
+		{
+			if ( ArrayFindString( Array_LocalCache, aTempData[ PointObjectName ] ) == -1 )
+			{
+				ArrayPushString( Array_LocalCache, aTempData[ PointObjectName ] );
+				json_object_remove( JSON_Handle, aTempData[ PointObjectName ] );
+
+				JSON_ObjectHandle = json_init_array( );
+			}
+			else
+			{
+				JSON_ObjectHandle = json_object_get_value( JSON_Handle, aTempData[ PointObjectName ] );
+			}
+		}
 		else
-			JSON_ObjectHandle = json_object_get_value( JSON_Handle, aTempData[ PointObjectName ] );
+		{
+			JSON_ObjectHandle = json_init_array( );
+		}
 
 		if ( JSON_ObjectHandle != Invalid_JSON )
 		{
@@ -480,6 +510,8 @@ public JSON_Points_Save( const Array: arHandle )
 			json_free( JSON_ObjectHandle );
 		}
 	}
+
+	ArrayDestroy( Array_LocalCache );
 
 	json_serial_to_file( JSON_Handle, gl_szFilePath, true );
 	json_free( JSON_Handle );
